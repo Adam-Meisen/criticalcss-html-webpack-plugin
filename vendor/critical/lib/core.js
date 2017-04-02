@@ -84,7 +84,7 @@ function appendStylesheets(opts) {
     return function (htmlfile) {
         // consider opts.css and map to array if it's a string
         if (opts.css) {
-            htmlfile.stylesheets = typeof opts.css === 'string' ? [opts.css] : opts.css;
+            htmlfile.stylesheets = Array.isArray(opts.css) ? opts.css : [opts.css];
             return htmlfile;
         }
 
