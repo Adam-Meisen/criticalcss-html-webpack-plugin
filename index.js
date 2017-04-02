@@ -2,7 +2,7 @@
  * @author Adam Meisenheimer (https://github.com/Adam-Meisen)
  */
 
-const Critical = require('critical');
+const Critical = require('./vendor/critical');
 const _ = require('lodash');
 const Vinyl = require('vinyl');
 const path = require('path');
@@ -77,6 +77,9 @@ class CriticalCSSInjectorWebpackPlugin {
                 // now we have the source with critical CSS injected
                 /** @type {{html: string}} newHtmlPluginData */
                 const newHtmlPluginData = htmlPluginData;
+
+                // I don't know why, but sometimes Critical returns a utf8 array,
+                // other times it returns a string.
                 if (typeof modifiedSource !== 'string') {
                   console.log('modifiedSource: ', typeof modifiedSource);
                   console.log(modifiedSource);
@@ -84,7 +87,7 @@ class CriticalCSSInjectorWebpackPlugin {
                 } else newHtmlPluginData.html = modifiedSource;
                 debugger;
 
-                // return to html-webpack-plugin
+                // return control to html-webpack-plugin
                 return callback(null, newHtmlPluginData);
               })
               .catch((err) => {
