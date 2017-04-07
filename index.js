@@ -3,34 +3,31 @@
  */
 
 const Critical = require('./vendor/critical');
-const _ = require('lodash');
 const Vinyl = require('vinyl');
 const path = require('path');
+const _ = require('lodash');
 
-const defaultOptions = {
-  testKey1: 'testVal1',
-  testKey2: 'testVal2',
-  /** @type {RegExp | RegExp[] | boolean} include */
-  include: /\.html?$/,
-  /** @type {RegExp | RegExp[] | boolean} exclude */
-  exclude: false,
-  /** @type {RegExp | RegExp[] | boolean} exclude */
-  cssFilter: /\.css$/,
-  criticalOptions: {
-    /** @type {boolean} inline - inline generated CSS */
-    inline: true,
-    /** @type {object | boolean} minify - minify generated CSS */
-    minify: false,
-    /** @type {string} base*/
-    base: '',
-  },
-};
-
-class CriticalCSSInjectorWebpackPlugin {
+class CriticalCSSWebpackPlugin {
   constructor(options) {
-    // this.options = Object.assign({}, defaultOptions, options);
+    // define this here so I don't have to type the full name later
+    this.vinylizeCSSFile = CriticalCSSWebpackPlugin.vinylizeCSSFile;
+    const defaultOptions = {
+      /** @type {RegExp | boolean} include */
+      include: /\.html?$/,
+      /** @type {RegExp | RegExp[] | boolean} exclude */
+      exclude: false,
+      /** @type {RegExp | RegExp[] | boolean} cssInclude */
+      cssInclude: /\.css$/,
+      /** @type {RegExp | RegExp[] | boolean} cssExclude */
+      cssExclude: false,
+      criticalOptions: {
+        /** @type {boolean} inline */
+        inline: true,
+        /** @type {object | boolean} minify */
+        minify: false,
+      },
+    };
     this.options = _.defaultsDeep({}, options, defaultOptions);
-    this.vinylizeCSSFile = CriticalCSSInjectorWebpackPlugin.vinylizeCSSFile;
   }
 
   /**
@@ -55,7 +52,7 @@ class CriticalCSSInjectorWebpackPlugin {
 
           debugger;
           // filter assets to just css files
-          const cssFiles = assets.filter(name => options.cssFilter.test(name))
+          const cssFiles = assets.filter(name => options.cssInclude.test(name))
             // convert css filenames to virtual files
             .map((cssFilename) => {
               if (Vinyl.isVinyl(cssFilename)) return cssFilename;
@@ -78,11 +75,11 @@ class CriticalCSSInjectorWebpackPlugin {
                 /** @type {{html: string}} newHtmlPluginData */
                 const newHtmlPluginData = htmlPluginData;
 
-                // I don't know why, but sometimes Critical returns a utf8 array,
-                // other times it returns a string.
+                // I don't know why, but sometimes Critical returns a utf8 buffer,
+                // and other times it returns a string.
                 if (typeof modifiedSource !== 'string') {
-                  console.log('modifiedSource: ', typeof modifiedSource);
-                  console.log(modifiedSource);
+                  console.log('modifiedSource is a: ', typeof modifiedSource);
+                  // console.log(modifiedSource);
                   newHtmlPluginData.html = String.fromCharCode(...new Uint8Array(modifiedSource));
                 } else newHtmlPluginData.html = modifiedSource;
                 debugger;
@@ -106,16 +103,14 @@ class CriticalCSSInjectorWebpackPlugin {
    * @param {function} callback
    */
   sendToCritical(source, cssFiles) {
-    // convert css filenames such as 'test.css' to paths
     let criticalOptions = {
       html: source,
-      assetPaths: [],
       css: cssFiles,
     };
     criticalOptions = Object.assign({}, this.options.criticalOptions, criticalOptions);
     debugger;
 
-    // returns promise that resolves to html string or error
+    // returns promise that resolves to html result or error
     return Critical.generate(criticalOptions);
   }
 
@@ -134,6 +129,27 @@ class CriticalCSSInjectorWebpackPlugin {
     debugger;
     return new Vinyl(vinylOpts);
   }
+
+  /**
+   * @returns {boolean}
+   * @param {string} filename - name of or path to HTML file
+   * @param {string} type - should be 'html' or 'css'
+   */
+  HTMLFilter(filepath, type) {
+    /** @type {RegExp[]} include */
+    const include = _.castArray(this.options.include);
+    /** @type {RegExp[]} exclude */
+    const exclude = _.castArray(this.options.exclude);
+
+    // if `filepath` matches at least one pattern in `options.include`
+    if (include.some(regex => regex.match(filepath))) {
+      // if `filepath` matches none of the patterns in `options.exclude`
+      if (!exclude.some(regex => regex.match(filepath))) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
-module.exports = CriticalCSSInjectorWebpackPlugin;
+module.exports = CriticalCSSWebpackPlugin;
