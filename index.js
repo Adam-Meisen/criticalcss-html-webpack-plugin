@@ -29,14 +29,8 @@ const Vinyl = require('vinyl');
 const path = require('path');
 const _ = require('lodash');
 
-/**
- *
- *
- * @class CriticalCSSWebpackPlugin
- * @type {CriticalCSSWebpackPlugin}
- */
 class CriticalCSSWebpackPlugin {
-  /**
+  /** Creates an instance of CriticalCSSWebpackPlugin.
    * @param {ConfigOptions} options
    *
    * @memberOf CriticalCSSWebpackPlugin
@@ -69,10 +63,6 @@ class CriticalCSSWebpackPlugin {
         include: /\.css$/,
         exclude: false,
       },
-      include: /\.html?$/,
-      exclude: false,
-      cssInclude: /\.css$/,
-      cssExclude: false,
       /**
        * Custom rules for files matching certain Regular expressions
        * @type {boolean | {a: {include: RegExp | RegExp[], exclude: RegExp | RegExp[]}}}
@@ -93,26 +83,10 @@ class CriticalCSSWebpackPlugin {
       },
     };
     opts = _.defaultsDeep(opts, options, defaultOptions);
-    if (opts.html instanceof RegExp
-        || (Array.isArray(opts.html) && opts.html[0] instanceof RegExp)) {
-      // opts.html is a RegExp or RegExp[]
-      opts.html = {
-        include: opts.html,
-        exclude: false,
-      };
-    }
-    if (opts.css instanceof RegExp
-        || (Array.isArray(opts.css) && opts.css[0] instanceof RegExp)) {
-      // opts.css is a RegExp or RegExp[]
-      opts.css = {
-        include: opts.css,
-        exclude: false,
-      };
-    }
     return opts;
   }
 
-  /**
+  /** Hook into compiler
    * @param {?} compiler - webpack compiler object
    *
    * @memberOf CriticalCSSWebpackPlugin
@@ -131,7 +105,6 @@ class CriticalCSSWebpackPlugin {
           const opts = this.options;
           /** @type {string} filename */
           const filename = htmlPluginData.outputName;
-          debugger;
           if (!this.fileFilter(filename, opts.html)) {
             // the html filename does not pass the html file filter
             return callback(null, htmlPluginData);
@@ -230,14 +203,13 @@ class CriticalCSSWebpackPlugin {
     const exclude = (() => {
       if (typeof filter.exclude === 'boolean') {
         return false;
-      } else {
-        return _.castArray(filter.exclude);
       }
+      return _.castArray(filter.exclude);
     })();
 
-    // if `filepath` matches at least one pattern in `options.include`
+    // if `filepath` matches at least one pattern in `include`
     if (include.some(regex => regex.test(filepath))) {
-      // if exclude is false or`filepath` matches none of the patterns in `options.exclude`
+      // if `exclude` is false or`filepath` matches none of the patterns in `exclude`
       if (!exclude) {
         return true;
       }
