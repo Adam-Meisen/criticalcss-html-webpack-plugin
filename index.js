@@ -36,7 +36,7 @@ class CriticalCSSWebpackPlugin {
    * @memberOf CriticalCSSWebpackPlugin
    */
   constructor(options) {
-    // attach these static functions here so I don't have to type the full name later
+    // attach these static functions here so I don't have to type the full names later
     this.vinylizeCSSFile = CriticalCSSWebpackPlugin.vinylizeCSSFile;
     this.fileFilter = CriticalCSSWebpackPlugin.FileFilter;
 
@@ -62,20 +62,6 @@ class CriticalCSSWebpackPlugin {
       css: {
         include: /\.css$/,
         exclude: false,
-      },
-      /**
-       * Custom rules for files matching certain Regular expressions
-       * @type {boolean | {a: {include: RegExp | RegExp[], exclude: RegExp | RegExp[]}}}
-       */
-      custom: {
-        /** custom filters go here */
-        a: {
-          include: /^(?!\s*$).+/,
-          exclude: /^(?!\s*$).+/,
-          criticalOptions: {
-            /** options that only apply to files that match previous regex */
-          },
-        },
       },
       criticalOptions: {
         inline: true,
