@@ -47,10 +47,7 @@ class CriticalCSSWebpackPlugin {
     this.fileFilter = CriticalCSSWebpackPlugin.FileFilter;
 
 
-    if (options.custom) {
-      // let customrules = options.custom;
-
-    }
+    this.options = CriticalCSSWebpackPlugin.setupOptions(options);
   }
   /** Apply default options and normalize options object
    * @param {ConfigOptions} options
@@ -136,7 +133,7 @@ class CriticalCSSWebpackPlugin {
           const filename = htmlPluginData.outputName;
           debugger;
           if (!this.fileFilter(filename, opts.html)) {
-            //make sure the filename
+            // the html filename does not pass the html file filter
             return callback(null, htmlPluginData);
           }
 
@@ -160,7 +157,7 @@ class CriticalCSSWebpackPlugin {
           const source = htmlPluginData.html;
 
           // send source to Critical
-          self.sendToCritical(source, cssFiles)
+          return self.sendToCritical(source, cssFiles)
             .then((modifiedSource) => {
               // now we have the source with critical CSS injected
               /** @type {{html: string}} newHtmlPluginData */
@@ -229,16 +226,23 @@ class CriticalCSSWebpackPlugin {
    * @memberOf CriticalCSSWebpackPlugin
    */
   static FileFilter(filepath, filter) {
-    const include = filter.include;
-    const exclude = filter.exclude;
+    const include = _.castArray(filter.include);
+    const exclude = (() => {
+      if (typeof filter.exclude === 'boolean') {
+        return false;
+      } else {
+        return _.castArray(filter.exclude);
+      }
+    })();
 
     // if `filepath` matches at least one pattern in `options.include`
-    if (include.some(regex => regex.match(filepath))) {
-      // if `filepath` matches none of the patterns in `options.exclude`
+    if (include.some(regex => regex.test(filepath))) {
+      // if exclude is false or`filepath` matches none of the patterns in `options.exclude`
       if (!exclude) {
         return true;
       }
-      if (!exclude.some(regex => regex.match(filepath))) {
+      // exclude must be RegExp or RegExp[]
+      if (!exclude.some(regex => regex.test(filepath))) {
         return true;
       }
     }
