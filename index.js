@@ -2,96 +2,183 @@
  * @author Adam Meisenheimer (https://github.com/Adam-Meisen)
  */
 
+/** CustomFilter
+ * @typedef CustomFilter
+ * @type {Object}
+ * @property {RegExp | RegExp[]} include
+ * @property {RegExp | RegExp[] | boolean} exclude
+ */
+
+/** CriticalOptions
+ * @typedef CriticalOptions
+ * @type {Object}
+ * @summary https://github.com/addyosmani/critical#options
+ */
+
+/** ConfigOptions
+ * @typedef ConfigOptions
+ * @type {Object}
+ * @property {CustomFilter} html
+ * @property {CustomFilter} css
+ * @property {Object} custom
+ * @property {CriticalOptions} CriticalOptions
+ */
+
 const Critical = require('./vendor/critical');
 const Vinyl = require('vinyl');
 const path = require('path');
 const _ = require('lodash');
 
+/**
+ *
+ *
+ * @class CriticalCSSWebpackPlugin
+ * @type {CriticalCSSWebpackPlugin}
+ */
 class CriticalCSSWebpackPlugin {
+  /**
+   * @param {ConfigOptions} options
+   *
+   * @memberOf CriticalCSSWebpackPlugin
+   */
   constructor(options) {
-    // define this here so I don't have to type the full name later
+    // attach these static functions here so I don't have to type the full name later
     this.vinylizeCSSFile = CriticalCSSWebpackPlugin.vinylizeCSSFile;
+    this.fileFilter = CriticalCSSWebpackPlugin.FileFilter;
+
+
+    if (options.custom) {
+      // let customrules = options.custom;
+
+    }
+  }
+  /** Apply default options and normalize options object
+   * @param {ConfigOptions} options
+   * @returns {ConfigOptions}
+   *
+   * @memberOf CriticalCSSWebpackPlugin
+   */
+  static setupOptions(options) {
+    /** @type {ConfigOptions} opts */
+    let opts = {};
+
+    /** @type {ConfigOptions} defaultOptions*/
     const defaultOptions = {
-      /** @type {RegExp | boolean} include */
+      html: {
+        include: /\.html?$/,
+        exclude: false,
+      },
+      css: {
+        include: /\.css$/,
+        exclude: false,
+      },
       include: /\.html?$/,
-      /** @type {RegExp | RegExp[] | boolean} exclude */
       exclude: false,
-      /** @type {RegExp | RegExp[] | boolean} cssInclude */
       cssInclude: /\.css$/,
-      /** @type {RegExp | RegExp[] | boolean} cssExclude */
       cssExclude: false,
+      /**
+       * Custom rules for files matching certain Regular expressions
+       * @type {boolean | {a: {include: RegExp | RegExp[], exclude: RegExp | RegExp[]}}}
+       */
+      custom: {
+        /** custom filters go here */
+        a: {
+          include: /^(?!\s*$).+/,
+          exclude: /^(?!\s*$).+/,
+          criticalOptions: {
+            /** options that only apply to files that match previous regex */
+          },
+        },
+      },
       criticalOptions: {
-        /** @type {boolean} inline */
         inline: true,
-        /** @type {object | boolean} minify */
         minify: false,
       },
     };
-    this.options = _.defaultsDeep({}, options, defaultOptions);
+    opts = _.defaultsDeep(opts, options, defaultOptions);
+    if (opts.html instanceof RegExp
+        || (Array.isArray(opts.html) && opts.html[0] instanceof RegExp)) {
+      // opts.html is a RegExp or RegExp[]
+      opts.html = {
+        include: opts.html,
+        exclude: false,
+      };
+    }
+    if (opts.css instanceof RegExp
+        || (Array.isArray(opts.css) && opts.css[0] instanceof RegExp)) {
+      // opts.css is a RegExp or RegExp[]
+      opts.css = {
+        include: opts.css,
+        exclude: false,
+      };
+    }
+    return opts;
   }
 
   /**
-   *  @param {?} compiler - webpack compiler object
+   * @param {?} compiler - webpack compiler object
+   *
+   * @memberOf CriticalCSSWebpackPlugin
    */
   apply(compiler) {
     const options = this.options;
     const self = this;
     compiler.plugin('compilation', (compilation) => {
-      // with html-webpack-plugin
       compilation.plugin('html-webpack-plugin-after-html-processing',
         /**
          *  @param {{plugin: {assetJson: string}}} htmlPluginData
          *  @param {function} callback
          */
         (htmlPluginData, callback) => {
+          /** @type {ConfigOptions} opts */
+          const opts = this.options;
           /** @type {string} filename */
           const filename = htmlPluginData.outputName;
+          debugger;
+          if (!this.fileFilter(filename, opts.html)) {
+            //make sure the filename
+            return callback(null, htmlPluginData);
+          }
 
           /** @type {string[]} assets */
           const assets = JSON.parse(htmlPluginData.plugin.assetJson);
 
-          debugger;
           // filter assets to just css files
-          const cssFiles = assets.filter(name => options.cssInclude.test(name))
+          const cssFiles = assets.filter(filepath => this.fileFilter(filepath, opts.css))
             // convert css filenames to virtual files
             .map((cssFilename) => {
               if (Vinyl.isVinyl(cssFilename)) return cssFilename;
-              debugger;
+
               return this.vinylizeCSSFile(
                 cssFilename,
                 options.criticalOptions.base,
                 Buffer.from(compilation.assets[cssFilename].source()));
             });
-          // if the filename matches include pattern and doesn't match exclude pattern
-          debugger;
-          if (options.include.test(filename) && ((typeof options.exclude.test === 'function') ? !options.exclude.test(filename) : true)) {
-            /** @type {string} source */
-            const source = htmlPluginData.html;
 
-            // send source to Critical
-            self.sendToCritical(source, cssFiles)
-              .then((modifiedSource) => {
-                // now we have the source with critical CSS injected
-                /** @type {{html: string}} newHtmlPluginData */
-                const newHtmlPluginData = htmlPluginData;
+          // if the filename matches include patterns and doesn't match exclude patterns
+          /** @type {string} source */
+          const source = htmlPluginData.html;
 
-                // I don't know why, but sometimes Critical returns a utf8 buffer,
-                // and other times it returns a string.
-                if (typeof modifiedSource !== 'string') {
-                  console.log('modifiedSource is a: ', typeof modifiedSource);
-                  // console.log(modifiedSource);
-                  newHtmlPluginData.html = String.fromCharCode(...new Uint8Array(modifiedSource));
-                } else newHtmlPluginData.html = modifiedSource;
-                debugger;
+          // send source to Critical
+          self.sendToCritical(source, cssFiles)
+            .then((modifiedSource) => {
+              // now we have the source with critical CSS injected
+              /** @type {{html: string}} newHtmlPluginData */
+              const newHtmlPluginData = htmlPluginData;
 
-                // return control to html-webpack-plugin
-                return callback(null, newHtmlPluginData);
-              })
-              .catch((err) => {
-                console.log(err);
-                return err;
-              });
-          } else callback(null, htmlPluginData);
+              // I don't know why, but sometimes Critical returns a utf8 buffer,
+              // and other times it returns a string.
+              if (typeof modifiedSource !== 'string') {
+                newHtmlPluginData.html = String.fromCharCode(...new Uint8Array(modifiedSource));
+              } else newHtmlPluginData.html = modifiedSource;
+
+              // return control to html-webpack-plugin
+              return callback(null, newHtmlPluginData);
+            })
+            .catch((err) => {
+              console.log(err);
+              return err;
+            });
         });
     });
   }
@@ -101,6 +188,8 @@ class CriticalCSSWebpackPlugin {
    * @param {string} source
    * @param {string[]} cssFiles
    * @param {function} callback
+   *
+   * @memberOf CriticalCSSWebpackPlugin
    */
   sendToCritical(source, cssFiles) {
     let criticalOptions = {
@@ -108,7 +197,7 @@ class CriticalCSSWebpackPlugin {
       css: cssFiles,
     };
     criticalOptions = Object.assign({}, this.options.criticalOptions, criticalOptions);
-    debugger;
+    // debugger;
 
     // returns promise that resolves to html result or error
     return Critical.generate(criticalOptions);
@@ -118,6 +207,8 @@ class CriticalCSSWebpackPlugin {
    * @param {string} filename
    * @param {string} basePath
    * @param {Buffer} fileContents
+   *
+   * @memberOf CriticalCSSWebpackPlugin
    */
   static vinylizeCSSFile(filename, basePath, fileContents) {
     const vinylOpts = {
@@ -126,30 +217,34 @@ class CriticalCSSWebpackPlugin {
       path: path.join(basePath, filename),
       contents: fileContents,
     };
-    debugger;
+    // debugger;
     return new Vinyl(vinylOpts);
   }
 
-  /**
+  /** Filter files with a given filter
    * @returns {boolean}
    * @param {string} filename - name of or path to HTML file
-   * @param {string} type - should be 'html' or 'css'
+   * @param {CustomFilter} filter
+   *
+   * @memberOf CriticalCSSWebpackPlugin
    */
-  HTMLFilter(filepath, type) {
-    /** @type {RegExp[]} include */
-    const include = _.castArray(this.options.include);
-    /** @type {RegExp[]} exclude */
-    const exclude = _.castArray(this.options.exclude);
+  static FileFilter(filepath, filter) {
+    const include = filter.include;
+    const exclude = filter.exclude;
 
     // if `filepath` matches at least one pattern in `options.include`
     if (include.some(regex => regex.match(filepath))) {
       // if `filepath` matches none of the patterns in `options.exclude`
+      if (!exclude) {
+        return true;
+      }
       if (!exclude.some(regex => regex.match(filepath))) {
         return true;
       }
     }
     return false;
   }
+
 }
 
 module.exports = CriticalCSSWebpackPlugin;
