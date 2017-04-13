@@ -15,7 +15,6 @@
   "author": "Adam Meisenheimer",
   "license": "MIT",
   "dependencies": {
-    "critical": "^0.8.4",
     "lodash": "^4.17.4",
     "vinyl": "^2.0.1"
   }
